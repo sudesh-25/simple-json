@@ -1,16 +1,10 @@
 (ns simple-json.core
   (:require [clojure.string :as cls]))
 
-(defn -main
-  "I don't do a whole lot."
-  []
-  (println "Hello, World!"))
-(def my-str "{\"name\":\"John\", \"age\":null, \"city\":\"New York\" \"salary\": 500.55 \"exponential\": 2E20}")
 (def regex-strings
   {
-   :int #"([\+-]?\d+)([eE][\+-]?\d+)?"                  ; #"/^([+-]?[1-9]\\d*|0)$/"
-   :double #"/^[0-9]+(\\.[0-9]+)?$"
-   :exponential #"e e+ e- E E+ E-"
+   :inte #"^([-]?\s*[^0\D]\d*)\D*.*$"                           ;any no of w/s b/w  '- and digits'
+   :doublee #"^([-]?\s*(?:0|[1-9]\d*)(?:\.[0-9]+)?(?:(?:e|e+|e-|E|E+|E-){1}[+-]?\d+)?)\D*$"          ;(?: non capturing parens)
    }
   )
 (defn get-object
@@ -72,26 +66,6 @@
       :else [nil input-str]
       )
   )
-(defn parse-int
-  "Parses the string to int"
-  [input-str]
-  (let [x (re-find (:int regex-strings) input-str)]
-    (if x
-      [(Integer/parseInt x) (subs input-str (count input-str))]
-      [nil input-str]
-      )
-    )
-  )
-(defn parse-double
-  "Parses double value in string"
-  [input-str]
-  (let [x (re-find (:double regex-strings) input-str)]
-    (if x
-      [(Double/parseDouble x) (subs input-str (count input-str))]
-      [nil input-str]
-      )
-    )
-  )
 (defn parse-colon
   "A value or object or array can be encountered after a colon"
   [input-str]
@@ -110,26 +84,44 @@
           )
     )
   )
+(defn parse-int
+  "Parses the string to int"
+  [input-str]
+  (let [[ss result] (re-find (:inte regex-strings) input-str)]
+    (if result
+      [(Integer/parseInt result) (subs input-str (count result))]
+      [nil input-str]
+      )
+    )
+  )
+(defn parse-double
+  "Parses double value in string"
+  [input-str]
+  (let [[ss result] (re-find (:doublee regex-strings) input-str)]
+    (if result
+      [(Double/parseDouble result) (subs input-str (count result))]
+      [nil input-str]
+      )
+    )
+  )
+
 (defn parse-number
   "Parses a string to it's semantic data type
   Todo implement for exponential
   "
   [input-str]
-  (let [[x y] (parse-int input-str)]
+  (let [[x y] (parse-double input-str)]
     (if x [x y]
-          (let [[a b] (parse-double input-str)]
+          (let [[a b] (parse-int input-str)]
             (if a [a b]
                   [a b])
             )
           )
     )
   )
-
-
-
-
-(println (get-object my-str))
-(println (clojure.string/split (get-object my-str) #","))
-(println (split-object (get-object my-str)))
-(println (parse-string "\"hello\" baby"))
-;(println (parse-int "45"))
+;; to be removed later
+(defn -main
+  "I don't do a whole lot."
+  []
+  (println "Hello, World!"))
+(def my-str "{\"name\":\"John\", \"age\":null, \"city\":\"New York\" \"salary\": 500.55 \"exponential\": 2E20}")
