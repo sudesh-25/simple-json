@@ -61,8 +61,8 @@
   "Parses the string value to bool value"
   [input-str]
     (cond
-      (= (subs input-str 0 4) "true") [true (subs input-str 4)]
-      (= (subs input-str 0 5) "false") [false (subs input-str 5)]
+      (cls/starts-with? input-str "true") [true (subs input-str 4)]
+      (cls/starts-with? input-str "false") [false (subs input-str 5)]
       :else [nil input-str]
       )
   )
