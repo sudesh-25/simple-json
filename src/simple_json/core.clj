@@ -3,27 +3,28 @@
 
 (def regex-strings
   {
-   :inte #"^([-]?\s*[^0\D]\d*)\D*.*$"                           ;any no of w/s b/w  '- and digits'
-   :doublee #"^([-]?\s*(?:0|[1-9]\d*)(?:\.[0-9]+)?(?:(?:e|e+|e-|E|E+|E-){1}[+-]?\d+)?)\D*$"          ;(?: non capturing parens)
+   :inte #"^([-]?[1-9]\d*\.?[0]*)\D*$"                 ;#"^([-]?\s*[^0\D]\d*[\.eE]{0}\d*)\D*.*$"                           ;any no of w/s b/w  '- and digits'
+   :doublee #"^([-]?\s*(?:0|[1-9]\d*)[\.eE]{1}[+-]?\d+)\D*$" ; false +ve for 5.5e5       ;(?: non capturing parens)
    }
   )
-(defn get-object
-  "Gets the string content inside {} structure"
-  [json-string]
-  (if (empty? json-string)
-    nil
-    (let [output-object (subs json-string (inc (cls/index-of json-string "{"))  (cls/last-index-of json-string "}"))]
-      (if (empty? output-object)
-        nil
-        output-object)
-      )
-    )
-  )
-(defn split-object
-  "Splits the object on ',' "
-  [object-string]
-  (map clojure.string/trim (cls/split object-string #","))
-  )
+;(defn get-object
+;  "Gets the string content inside {} structure"
+;  [json-string]
+;  (if (empty?
+;        json-string)
+;    nil
+;    (let [output-object (subs json-string (inc (cls/index-of json-string "{"))  (cls/last-index-of json-string "}"))]
+;      (if (empty? output-object)
+;        nil
+;        output-object)
+;      )
+;    )
+;  )
+;(defn split-object
+;  "Splits the object on ',' "
+;  [object-string]
+;  (map clojure.string/trim (cls/split object-string #","))
+;  )
 (defn parse-string
   [input-str]
   (if (= \" (first input-str))
@@ -39,44 +40,63 @@
 (declare parse-array)
 (declare parse-object)
 (declare factory-parsers)
+(declare parse)
 
 (defn parse-null
   "Parses null values to nil"
   [input-str]
-  (if (= "null" (subs input-str 0 4))
-    [nil (subs input-str 4)]
-    [nil input-str])
+  (if (nil? input-str)
+    nil
+    (if (cls/starts-with? input-str "null")
+      (subs input-str 4)
+      nil)
+    )
   )
+(def esc-list '(\space \backspace \newline \formfeed \tab \] \}))
 (defn parse-space
   "Removes whitespaces from left of strings"
   [input-str]
-  (if (= \space (first input-str))
-    [nil cls/triml input-str]
-    [nil input-str])
+  (if (empty?
+        input-str)
+    input-str
+    (if (some
+          #(= (char (first input-str))  %)
+          esc-list)
+      (parse-space (subs input-str 1))
+      input-str)
+    )
+
   )
 (defn parse-comma
   "Ignores ',' & returns remaining string"
   [input-str]
-  (if (= \, (first input-str))
-    [nil (subs input-str 1)]
-    [nil input-str])
+  (if (empty?
+        input-str)
+    nil
+    (if (= \, (first input-str))
+      (subs input-str 1)
+      nil))
   )
 
 (defn parse-boolean
   "Parses the string value to bool value"
   [input-str]
+  (if (nil? input-str)
+    nil
     (cond
       (cls/starts-with? input-str "true") [true (subs input-str 4)]
       (cls/starts-with? input-str "false") [false (subs input-str 5)]
       :else [nil input-str]
       )
+    )
   )
 
 (defn parse-literal
   "Parses null true false"
   [input-str]
   (let [[x xs] (parse-boolean input-str)]
-    (if x [x xs]
+    (if x
+      [x xs]
           (let [[y ys] (parse-null input-str)]
             [y ys])
           )
@@ -109,7 +129,8 @@
   "
   [input-str]
   (let [[x y] (parse-double input-str)]
-    (if x [x y]
+    (if x
+      [x y]
           (let [[a b] (parse-int input-str)]
             (if a [a b]
                   [a b])
@@ -120,57 +141,87 @@
 
 (defn parse-colon
   "A value or object or array can be encountered after a colon"
-  [[x xs]]
-  (if (= \: x)
-    [nil xs]
-    [nil (str x xs)]
+  [input-str]
+  (if (empty?
+        input-str)
+    nil
+    (if (= \: (first input-str))
+      (subs input-str 1)
+      nil
+      )
     )
   )
 
 (defn parse-array
-  [x xs]
-  (if (= x \[)
-    [(parse-values factory-parsers xs)]
+  [input-str]
+  (if (= (first input-str) \[)
+    (let [[x y] (parse (subs input-str 1))]
+      (if (nil? x)
+        [nil input-str]
+        [[x] y])
+      )
     )
   )
 
 (defn parse-object
   ""
-  [[x xs]]
-  (if (= x \{)
-    (let [[key rem] (parse-values factory-parsers xs)]
-      (let [[value remain] (parse-values factory-parsers rem)]
+  [input-str]
+  (if (= (first input-str) \{)
+    (let [[key rem] (parse (subs input-str 1))]
+      (let [[value remain] (parse rem)]
         [(hash-map key value) remain]
         )
       )
-    [nil (str x xs)])
+    [nil input-str])
   )
 
-(def factory-parsers (list parse-space parse-string parse-object parse-array parse-number parse-comma parse-colon ))
+(def factory-parsers (list parse-boolean parse-number parse-string  parse-array  parse-object))
 
 (defn parse-values
-  "Parsing function called on where a value is expected like after ':' "
+  "Tries all parsers & return when a parser can parse the value"
   [[p & parsers] input-str]
-  (if false                                                      ;(or (empty? input-str) (empty? parsers))
-    nil
+  (if (or (empty? input-str) (nil? input-str))
+    [nil nil]
     (let [[result rem] (p input-str)]
-      (if result
-        result
+      (if (not (nil? result))
+        [result rem]
         (parse-values parsers rem))
       )
     )
   )
-
-(defn json-parse
-  "Parses the json string"
-  [input-string]
-  (parse-values factory-parsers input-string)
+(defn parse
+  ""
+  [input-str]
+  (let [x (parse-space input-str)]
+    (let [y (parse-comma x)]
+      (if y
+        (parse y)
+        (let [z (parse-null x)]
+          (if z
+            (parse z)
+            (let [col (parse-colon x)]
+              (if col
+                (parse col)
+                (parse-values factory-parsers x)
+                )
+              )
+            )
+          )
+        )
+      )
+    )
   )
+
 ;; to be removed later
 (defn -main
   "I don't do a whole lot."
   []
-  (println "Hello, World!"))
-(def my-str "{\"name\":\"John\", \"age\":null, \"city\":\"New York\" \"salary\": 500.55 \"exponential\": 2E20}")
-(def test-str "  {  \"name\":\"john\"}")
-(println (json-parse test-str))
+  (def my-str "{\"name\":\"John\", \"age\":null, \"city\":\"New York\" \"salary\": 500.55 \"exponential\": 2E20}")
+  (def test-str "{\"name\": 5 , \"kk\":\"js\"}")
+  (def test-colon ": 5 ")
+  (println "Hello, World!")
+  ;(parse "false")
+  ;(println (parse-array "[\"hello\"]"))
+  ;(println (parse "}"))
+  (println (parse-object test-str))
+  )
