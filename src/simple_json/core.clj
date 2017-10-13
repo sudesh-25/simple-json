@@ -3,8 +3,8 @@
 
 (def regex-strings
   {
-   :inte #"^([-]?[1-9]\d*\.?[0]*)\D*$"                 ;#"^([-]?\s*[^0\D]\d*[\.eE]{0}\d*)\D*.*$"                           ;any no of w/s b/w  '- and digits'
-   :doublee #"^([-]?\s*(?:0|[1-9]\d*)[\.eE]{1}[+-]?\d+)\D*$" ; false +ve for 5.5e5       ;(?: non capturing parens)
+   :inte #"^(-?[1-9]\d*).*?$"                         ;any no of w/s b/w  '- and digits'
+   :doublee #"^([-]?\s*(?:0|[1-9]\d*)[\.eE]{1}[+-]?\d+).*?$" ; false +ve for 5.5e5       ;(?: non capturing parens)
    }
   )
 ;(defn get-object
@@ -49,9 +49,7 @@
     nil
     (if (cls/starts-with? input-str "null")
       (subs input-str 4)
-      nil)
-    )
-  )
+      nil)))
 (def esc-list '(\space \backspace \newline \formfeed \tab \] \}))
 (defn parse-space
   "Removes whitespaces from left of strings"
@@ -63,10 +61,7 @@
           #(= (char (first input-str))  %)
           esc-list)
       (parse-space (subs input-str 1))
-      input-str)
-    )
-
-  )
+      input-str)))
 (defn parse-comma
   "Ignores ',' & returns remaining string"
   [input-str]
@@ -75,8 +70,7 @@
     nil
     (if (= \, (first input-str))
       (subs input-str 1)
-      nil))
-  )
+      nil)))
 
 (defn parse-boolean
   "Parses the string value to bool value"
@@ -86,42 +80,23 @@
     (cond
       (cls/starts-with? input-str "true") [true (subs input-str 4)]
       (cls/starts-with? input-str "false") [false (subs input-str 5)]
-      :else [nil input-str]
-      )
-    )
-  )
+      :else [nil input-str])))
 
-(defn parse-literal
-  "Parses null true false"
-  [input-str]
-  (let [[x xs] (parse-boolean input-str)]
-    (if x
-      [x xs]
-          (let [[y ys] (parse-null input-str)]
-            [y ys])
-          )
-    )
-  )
 (defn parse-int
   "Parses the string to int"
   [input-str]
   (let [[ss result] (re-find (:inte regex-strings) input-str)]
     (if result
       [(Integer/parseInt result) (subs input-str (count result))]
-      [nil input-str]
-      )
-    )
-  )
+      [nil input-str])))
+
 (defn parse-double
   "Parses double value in string"
   [input-str]
   (let [[ss result] (re-find (:doublee regex-strings) input-str)]
     (if result
       [(Double/parseDouble result) (subs input-str (count result))]
-      [nil input-str]
-      )
-    )
-  )
+      [nil input-str])))
 
 (defn parse-number
   "Parses a string to it's semantic data type
@@ -133,11 +108,7 @@
       [x y]
           (let [[a b] (parse-int input-str)]
             (if a [a b]
-                  [a b])
-            )
-          )
-    )
-  )
+                  [a b])))))
 
 (defn parse-colon
   "A value or object or array can be encountered after a colon"
@@ -147,21 +118,23 @@
     nil
     (if (= \: (first input-str))
       (subs input-str 1)
-      nil
-      )
-    )
-  )
+      nil)))
 
 (defn parse-array
-  [input-str]
-  (if (= (first input-str) \[)
-    (let [[x y] (parse (subs input-str 1))]
-      (if (nil? x)
-        [nil input-str]
-        [[x] y])
-      )
-    )
-  )
+  "Parses array structure of Json"
+  ([input-str]
+   (if (or (nil? input-str) (empty? input-str))
+     [nil input-str]
+     (if (= (first input-str) \[)
+       (parse-array (subs input-str 1) [])
+       [nil input-str])))
+  ([input-str arr]
+   (if (= (first input-str) \])
+     [arr (subs input-str 1)]
+     (let [[x y] (parse input-str)]
+       (if (nil? x)
+         [arr input-str]
+         (parse-array y (conj arr x)))))))
 
 (defn parse-object
   ""
@@ -169,11 +142,8 @@
   (if (= (first input-str) \{)
     (let [[key rem] (parse (subs input-str 1))]
       (let [[value remain] (parse rem)]
-        [(hash-map key value) remain]
-        )
-      )
-    [nil input-str])
-  )
+        [(hash-map key value) remain]))
+    [nil input-str]))
 
 (def factory-parsers (list parse-boolean parse-number parse-string  parse-array  parse-object))
 
@@ -185,10 +155,8 @@
     (let [[result rem] (p input-str)]
       (if (not (nil? result))
         [result rem]
-        (parse-values parsers rem))
-      )
-    )
-  )
+        (parse-values parsers rem)))))
+
 (defn parse
   ""
   [input-str]
@@ -202,15 +170,7 @@
             (let [col (parse-colon x)]
               (if col
                 (parse col)
-                (parse-values factory-parsers x)
-                )
-              )
-            )
-          )
-        )
-      )
-    )
-  )
+                (parse-values factory-parsers x)))))))))
 
 ;; to be removed later
 (defn -main
@@ -222,6 +182,8 @@
   (println "Hello, World!")
   ;(parse "false")
   ;(println (parse-array "[\"hello\"]"))
+  ;(println )
   ;(println (parse "}"))
-  (println (parse-object test-str))
+  ;(println (parse-object test-str))
   )
+(println (parse-array "[\"hfg\",\"dlk\",56.66, 4 ]"))
