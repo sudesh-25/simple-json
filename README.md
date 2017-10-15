@@ -1,10 +1,14 @@
 # simple-json
 
-A Clojure library designed to ... well, that part is up to you.
+A Clojure library designed to parse JSON data.
 
 ## Usage
 
-FIXME
+### To parse JSON strings call 'json-parse'
+    (json-parse "string-arg")
+
+### To parse JSON from files use 'json-parse-file'
+    (json-parse-file FILEPATH)
 
 ## License
 
