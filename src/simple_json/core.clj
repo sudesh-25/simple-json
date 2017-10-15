@@ -4,14 +4,14 @@
 
 (def regex-strings
   {
-   :inte #"^(-?[1-9][0-9]*).*?$"         ;fails for "1,\nas\"" any no of w/s b/w  '- and digits'
+   :inte #"^(-?(?:0|[1-9])[0-9]*).*?$"         ;fails for "1,\nas\"" any no of w/s b/w  '- and digits'
    :doublee #"^([-]?\s*(?:0|[1-9]\d*)\.?\d+(?:[eE][+-]?\d+)?).*?$" ; false +ve for 5.5e5       ;(?: non capturing parens)
    }
   )
 (defn parse-string
   [input-str]
   (if (= \" (first input-str))
-    (let [x (subs input-str 1 (cls/index-of input-str "\"" 2))]
+    (let [x (subs input-str 1 (cls/index-of input-str "\"" 1))]
       (if x
         [x (subs input-str (+ 2 (count x)))]
         [nil input-str]))
