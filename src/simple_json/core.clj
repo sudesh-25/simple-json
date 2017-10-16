@@ -4,16 +4,21 @@
 
 (def regex-strings
   {
-   :inte #"^(-?(?:0|[1-9])[0-9]*).*?$"         ;fails for "1,\nas\"" any no of w/s b/w  '- and digits'
-   :doublee #"^([-]?\s*(?:0|[1-9]\d*)\.?\d+(?:[eE][+-]?\d+)?).*?$" ; false +ve for 5.5e5       ;(?: non capturing parens)
+   :inte #"(-?\s*?(?:0|[1-9])[0-9]*)?"
+   :doublee #"^([-]?\s*(?:0|[1-9])\d*(?:\.\d)+?\d*(?:[eE][+-]?\d+)?)(?:.|\n)*?$" ; fails for "323e4"
+   :stringg #"([\"])(?:(?=(\\?))\2.)*?\1"
    }
+  )
+(defn get-string
+  [input]
+  (get (re-find (:stringg regex-strings) input) 0)
   )
 (defn parse-string
   [input-str]
   (if (= \" (first input-str))
-    (let [x (subs input-str 1 (cls/index-of input-str "\"" 1))]
+    (let [x (get-string input-str)]
       (if x
-        [x (subs input-str (+ 2 (count x)))]
+        [x (subs input-str (count x))]
         [nil input-str]))
     [nil input-str]))
 
@@ -62,7 +67,9 @@
   [input-str]
   (let [[ss result] (re-find (:inte regex-strings) input-str)]
     (if result
-      [(Integer/parseInt (cls/replace result " " "")) (subs input-str (count result))]
+      (if (< (count result) 17)
+        [(Long/parseLong (cls/replace result " " "")) (subs input-str (count result))]
+        [(BigInteger. (cls/replace result " " "")) (subs input-str (count result))])
       [nil input-str])))
 
 (defn parse-double
@@ -72,7 +79,6 @@
     (if result
       [(Double/parseDouble (cls/replace result " " "")) (subs input-str (count result))]
       [nil input-str])))
-
 (defn parse-number
   "Parses given string for numeric types"
   [input-str]
@@ -150,7 +156,7 @@
 (defn json-parse
   "Takes json string as argument & returns the parsed value"
   [input]
-  (get (parse (cls/replace input "\n" "")) 0)
+  (get (parse input) 0)
   )
 (defn json-parse-file
   "Enter file path name to parse json file"
